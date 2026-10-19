@@ -3,11 +3,11 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import { motion } from 'framer-motion'
-import { MapPin, CheckCircle, Navigation, Leaf, Star, LogOut, AlertTriangle, Loader2, Scale } from 'lucide-react'
+import { MapPin, CheckCircle, Navigation, Leaf, Star, LogOut, AlertTriangle, Loader2, Scale, Truck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import L from 'leaflet'
-import { reportAPI, collectionAPI, routingAPI } from '../lib/api'
-import { WASTE_TYPES, ACCRA_CENTER, ACCRA_ZOOM, SEVERITY_LEVELS } from '../lib/constants'
+import { reportAPI, collectionAPI, routingAPI, pickupAPI } from '../lib/api'
+import { WASTE_TYPES, ACCRA_CENTER, ACCRA_ZOOM, ISSUE_CATEGORIES } from '../lib/constants'
 import clsx from 'clsx'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -24,6 +24,7 @@ export default function CollectorApp() {
   const [activeReport, setActiveReport] = useState(null)
   const [route, setRoute] = useState(null)
   const [logForm, setLogForm] = useState({ weightKg: '', wasteType: 'MIXED' })
+  const [tab, setTab] = useState('jobs')
 
   useEffect(() => {
     const stored = localStorage.getItem('gp_collector')
@@ -34,6 +35,19 @@ export default function CollectorApp() {
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['reports'],
     queryFn: () => reportAPI.getAll().then(r => r.data),
+    refetchInterval: 30000,
+  })
+
+  const { data: availablePickups = [] } = useQuery({
+    queryKey: ['pickups-available'],
+    queryFn: () => pickupAPI.getAvailable().then(r => r.data),
+    refetchInterval: 30000,
+  })
+
+  const { data: myPickups = [] } = useQuery({
+    queryKey: ['pickups-collector', collector?.id],
+    queryFn: () => pickupAPI.getByCollector(collector.id).then(r => r.data),
+    enabled: !!collector,
     refetchInterval: 30000,
   })
 
@@ -52,6 +66,16 @@ export default function CollectorApp() {
       localStorage.setItem('gp_collector', JSON.stringify(updated)); setCollector(updated)
     },
     onError: () => toast.error('Failed to log collection'),
+  })
+
+  const acceptMutation = useMutation({
+    mutationFn: (id) => pickupAPI.accept(id),
+    onSuccess: (res) => {
+      toast.success(`Pickup accepted — ${res.data.resident?.firstName || 'the resident'} notified. En route now.`)
+      qc.invalidateQueries({ queryKey: ['pickups-available'] })
+      qc.invalidateQueries({ queryKey: ['pickups-collector', collector.id] })
+    },
+    onError: e => toast.error(e.response?.data?.error || 'Unable to accept pickup request'),
   })
 
   const assignReport = async (report) => {
@@ -83,6 +107,22 @@ export default function CollectorApp() {
         </div>
       </div>
 
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setTab('jobs')}
+          className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === 'jobs' ? 'bg-gp-forest text-white' : 'bg-gray-100 text-gp-grey hover:text-gp-slate'}`}
+        >
+          Drain Jobs ({pendingReports.length})
+        </button>
+        <button
+          onClick={() => setTab('pickups')}
+          className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === 'pickups' ? 'bg-gp-forest text-white' : 'bg-gray-100 text-gp-grey hover:text-gp-slate'}`}
+        >
+          <Truck className="w-4 h-4 inline mr-1" />Pickup Requests ({availablePickups.length})
+        </button>
+      </div>
+
+      {tab === 'jobs' && (
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
           {highPriority.length > 0 && (
@@ -108,6 +148,7 @@ export default function CollectorApp() {
                     <span className={`badge-${r.severity === 'HIGH' || r.severity === 'CRITICAL' ? 'high' : r.severity === 'MEDIUM' ? 'medium' : 'low'}`}>{r.severity}</span>
                     <span className="text-xs text-gp-grey">{new Date(r.createdAt).toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
+                  <p className="text-sm font-medium text-gp-slate">{ISSUE_CATEGORIES[r.category]?.label || 'Issue'}</p>
                   <p className="text-sm font-mono text-gp-slate">{r.lat.toFixed(4)}, {r.lng.toFixed(4)}</p>
                   {r.description && <p className="text-xs text-gp-grey mt-1 line-clamp-2">{r.description}</p>}
                   {activeReport?.id !== r.id && (
@@ -167,6 +208,63 @@ export default function CollectorApp() {
           )}
         </div>
       </div>
+      )}
+
+      {tab === 'pickups' && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 space-y-4">
+            <h2 className="font-display font-semibold text-gp-slate">Available Pickup Requests ({availablePickups.length})</h2>
+            {availablePickups.length === 0 ? (
+              <div className="card text-center py-8">
+                <CheckCircle className="w-10 h-10 text-gp-mint mx-auto mb-2" />
+                <p className="font-medium text-gp-slate">No pending pickups</p>
+                <p className="text-sm text-gp-grey mt-1">New resident requests will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {availablePickups.map(p => (
+                  <motion.div key={p.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="card">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="badge-medium">{WASTE_TYPES[p.wasteType]?.label || p.wasteType}</span>
+                      <span className="text-xs text-gp-grey">{new Date(p.createdAt).toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-sm font-bold text-gp-slate">{p.weightKg}kg</p>
+                    <p className="text-sm text-gp-grey">{p.resident?.firstName} {p.resident?.lastName}</p>
+                    {p.note && <p className="text-xs text-gp-grey mt-1 line-clamp-2">{p.note}</p>}
+                    <button
+                      onClick={() => acceptMutation.mutate(p.id)}
+                      disabled={acceptMutation.isPending && acceptMutation.variables === p.id}
+                      className="btn-primary mt-3 w-full text-xs py-2 flex items-center justify-center gap-1"
+                    >
+                      {acceptMutation.isPending && acceptMutation.variables === p.id
+                        ? <><Loader2 className="w-3 h-3 animate-spin" />Accepting...</>
+                        : <><Navigation className="w-3 h-3" />Accept & head out</>}
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="font-display font-semibold text-gp-slate">My accepted pickups ({myPickups.length})</h2>
+            {myPickups.length ? (
+              <div className="space-y-3">
+                {myPickups.map(p => (
+                  <div key={p.id} className="card">
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="font-medium text-gp-slate">{WASTE_TYPES[p.wasteType]?.icon} {p.wasteType} · {p.weightKg}kg</span>
+                      <span className={`text-xs font-semibold ${p.status === 'ACCEPTED' ? 'text-gp-emerald' : 'text-amber-600'}`}>{p.status}</span>
+                    </div>
+                    <p className="text-xs text-gp-grey mt-1">{p.resident?.firstName} {p.resident?.lastName} · {new Date(p.createdAt).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gp-grey">You have not accepted any pickup requests yet.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,14 +1,14 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, MapPin, AlertTriangle, CheckCircle, Upload, Loader2, Star } from 'lucide-react'
+import { Camera, MapPin, CheckCircle, Upload, Loader2, Star } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import L from 'leaflet'
 import { reportAPI } from '../lib/api'
-import { ACCRA_CENTER, ACCRA_ZOOM, SEVERITY_LEVELS } from '../lib/constants'
+import { ACCRA_CENTER, ACCRA_ZOOM, ISSUE_CATEGORIES } from '../lib/constants'
 
-// Fix Leaflet default marker icon
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -27,26 +27,46 @@ function LocationPicker({ onSelect }) {
 
 const steps = ['Photo', 'Location', 'Details', 'Submit']
 
+function getResidentId() {
+  try {
+    return JSON.parse(localStorage.getItem('gp_resident') || 'null')?.id
+  } catch {
+    return null
+  }
+}
+
 export default function CitizenReport() {
+  const [params] = useSearchParams()
   const [step, setStep] = useState(0)
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [position, setPosition] = useState(null)
-  const [severity, setSeverity] = useState('MEDIUM')
+  const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [earnedPoints, setEarnedPoints] = useState(0)
   const fileRef = useRef()
   const qc = useQueryClient()
 
+  useEffect(() => {
+    const lat = parseFloat(params.get('lat'))
+    const lng = parseFloat(params.get('lng'))
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) setPosition([lat, lng])
+  }, [params])
+
   const mutation = useMutation({
     mutationFn: (formData) => reportAPI.submit(formData),
     onSuccess: (res) => {
       setEarnedPoints(res.data.pointsEarned || 5)
       setSubmitted(true)
-      qc.invalidateQueries(['reports'])
+      qc.invalidateQueries({ queryKey: ['reports'] })
+      qc.invalidateQueries({ queryKey: ['resident'] })
     },
-    onError: () => toast.error('Failed to submit. Please try again.'),
+    onError: (error) => {
+      console.error('Report submission error:', error)
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit. Please try again.'
+      toast.error(errorMessage)
+    },
   })
 
   const handlePhoto = (e) => {
@@ -59,16 +79,33 @@ export default function CitizenReport() {
 
   const handleSubmit = () => {
     if (!photo || !position) {
-      toast.error('Please add a photo and pin the drain location.')
+      toast.error('Please add a photo and pin the location.')
+      return
+    }
+    if (!category) {
+      toast.error('Please select a category.')
       return
     }
     const fd = new FormData()
     fd.append('photo', photo)
     fd.append('lat', position[0])
     fd.append('lng', position[1])
-    fd.append('severity', severity)
+    fd.append('category', category)
+    fd.append('severity', ISSUE_CATEGORIES[category]?.defaultSeverity || 'MEDIUM')
     fd.append('description', description)
+    const residentId = getResidentId()
+    if (residentId) fd.append('residentId', residentId)
     mutation.mutate(fd)
+  }
+
+  const reset = () => {
+    setSubmitted(false)
+    setStep(0)
+    setPhoto(null)
+    setPhotoPreview(null)
+    setPosition(null)
+    setCategory('')
+    setDescription('')
   }
 
   if (submitted) {
@@ -88,7 +125,7 @@ export default function CitizenReport() {
           </motion.div>
           <h2 className="font-display font-bold text-2xl text-gp-slate mb-2">Report Submitted!</h2>
           <p className="text-gp-grey mb-6">
-            A collector has been notified. You'll help prevent flooding in your area.
+            A collector has been notified. You can track this issue from your dashboard.
           </p>
           <div className="bg-gp-foam rounded-2xl p-6 mb-6">
             <div className="font-display font-bold text-4xl text-gp-emerald mb-1">
@@ -99,9 +136,8 @@ export default function CitizenReport() {
               GreenPoints earned
             </div>
           </div>
-          <button onClick={() => { setSubmitted(false); setStep(0); setPhoto(null); setPhotoPreview(null); setPosition(null) }}
-            className="btn-primary w-full">
-            Report Another Drain
+          <button onClick={reset} className="btn-primary w-full">
+            Report Another Issue
           </button>
         </motion.div>
       </div>
@@ -111,11 +147,10 @@ export default function CitizenReport() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="font-display font-bold text-3xl text-gp-slate mb-2">Report a Choked Drain</h1>
-        <p className="text-gp-grey">Help prevent flooding. Earn GreenPoints. Takes under 60 seconds.</p>
+        <h1 className="font-display font-bold text-3xl text-gp-slate mb-2">Report an Issue</h1>
+        <p className="text-gp-grey">Choose a category, describe what you see, and help keep your neighbourhood clean.</p>
       </div>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8">
         {steps.map((s, i) => (
           <div key={i} className="flex items-center gap-2 flex-1">
@@ -138,17 +173,16 @@ export default function CitizenReport() {
 
       <div className="card">
         <AnimatePresence mode="wait">
-          {/* Step 0: Photo */}
           {step === 0 && (
             <motion.div key="photo"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <h2 className="font-display font-semibold text-xl text-gp-slate mb-2">Take a photo of the drain</h2>
+              <h2 className="font-display font-semibold text-xl text-gp-slate mb-2">Take a photo of the issue</h2>
               <p className="text-gp-grey text-sm mb-6">A clear photo helps our team verify the report faster.</p>
               <input ref={fileRef} type="file" accept="image/*" capture="environment"
                 onChange={handlePhoto} className="hidden" />
               {photoPreview ? (
                 <div className="relative">
-                  <img src={photoPreview} alt="Drain" className="w-full h-64 object-cover rounded-xl" />
+                  <img src={photoPreview} alt="Issue" className="w-full h-64 object-cover rounded-xl" />
                   <button onClick={() => fileRef.current.click()}
                     className="absolute bottom-3 right-3 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gp-slate shadow">
                     Change photo
@@ -171,17 +205,16 @@ export default function CitizenReport() {
             </motion.div>
           )}
 
-          {/* Step 1: Map */}
           {step === 1 && (
             <motion.div key="map"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <h2 className="font-display font-semibold text-xl text-gp-slate mb-2">Pin the drain location</h2>
+              <h2 className="font-display font-semibold text-xl text-gp-slate mb-2">Pin the location</h2>
               <p className="text-gp-grey text-sm mb-4">
                 <MapPin className="w-4 h-4 inline mr-1 text-gp-jade" />
                 Tap anywhere on the map to drop a pin
               </p>
               <div className="h-72 rounded-xl overflow-hidden mb-4">
-                <MapContainer center={ACCRA_CENTER} zoom={ACCRA_ZOOM} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={position || ACCRA_CENTER} zoom={ACCRA_ZOOM} style={{ height: '100%', width: '100%' }}>
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='© OpenStreetMap contributors'
@@ -197,7 +230,7 @@ export default function CitizenReport() {
               )}
               <div className="flex gap-3">
                 <button onClick={() => setStep(0)} className="btn-secondary flex-1">Back</button>
-                <button onClick={() => position && setStep(2)} 
+                <button onClick={() => position && setStep(2)}
                   className={`flex-1 ${position ? 'btn-primary' : 'bg-gray-100 text-gray-400 px-6 py-3 rounded-xl cursor-not-allowed'}`}>
                   Next: Add Details
                 </button>
@@ -205,67 +238,76 @@ export default function CitizenReport() {
             </motion.div>
           )}
 
-          {/* Step 2: Details */}
           {step === 2 && (
             <motion.div key="details"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <h2 className="font-display font-semibold text-xl text-gp-slate mb-6">Describe the blockage</h2>
-              
+              <h2 className="font-display font-semibold text-xl text-gp-slate mb-6">Tell us about the issue</h2>
+
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gp-slate mb-3">How severe is the blockage?</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(SEVERITY_LEVELS).map(([key, val]) => (
-                    <button key={key} onClick={() => setSeverity(key)}
-                      className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                        severity === key
-                          ? 'border-gp-emerald bg-gp-foam text-gp-forest'
-                          : 'border-gray-100 text-gray-500 hover:border-gp-mint'
-                      }`}>
-                      <div className="w-3 h-3 rounded-full mx-auto mb-1" style={{ background: val.color }} />
-                      {val.label}
-                    </button>
+                <label className="block text-sm font-medium text-gp-slate mb-2" htmlFor="issue-category">Select a category</label>
+                <select
+                  id="issue-category"
+                  className="input-field"
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  {Object.entries(ISSUE_CATEGORIES).map(([id, c]) => (
+                    <option key={id} value={id}>{c.label}</option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gp-slate mb-2">Additional details (optional)</label>
+                <label className="block text-sm font-medium text-gp-slate mb-2" htmlFor="issue-description">Describe what you see</label>
                 <textarea
+                  id="issue-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Drain completely blocked with plastic bags near Legon bus stop..."
-                  rows={3}
+                  placeholder="e.g. Bin overflowing onto the pavement near the market entrance..."
+                  rows={4}
                   className="input-field resize-none"
                 />
               </div>
 
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="btn-secondary flex-1">Back</button>
-                <button onClick={() => setStep(3)} className="btn-primary flex-1">Review & Submit</button>
+                <button
+                  onClick={() => {
+                    if (!category) { toast.error('Please select a category.'); return }
+                    setStep(3)
+                  }}
+                  className="btn-primary flex-1"
+                >
+                  Review & Submit
+                </button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Review */}
           {step === 3 && (
             <motion.div key="review"
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="font-display font-semibold text-xl text-gp-slate mb-6">Review your report</h2>
               <div className="space-y-4 mb-6">
-                <img src={photoPreview} alt="Drain" className="w-full h-48 object-cover rounded-xl" />
+                <img src={photoPreview} alt="Issue" className="w-full h-48 object-cover rounded-xl" />
                 <div className="bg-gp-foam rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gp-grey">Category</span>
+                    <span className="font-medium text-gp-slate">{ISSUE_CATEGORIES[category]?.label}</span>
+                  </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gp-grey">Location</span>
                     <span className="font-mono text-xs text-gp-slate">
                       {position ? `${position[0].toFixed(4)}, ${position[1].toFixed(4)}` : '—'}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gp-grey">Severity</span>
-                    <span className={`badge-${severity.toLowerCase() === 'critical' ? 'high' : severity.toLowerCase()}`}>
-                      {SEVERITY_LEVELS[severity]?.label}
-                    </span>
-                  </div>
+                  {description && (
+                    <div className="text-sm pt-1 border-t border-white/60">
+                      <span className="text-gp-grey block mb-1">What you see</span>
+                      <span className="text-gp-slate">{description}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-gp-grey">GreenPoints earned</span>
                     <span className="font-bold text-gp-emerald">+5 pts</span>

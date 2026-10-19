@@ -2,22 +2,34 @@ const { PrismaClient } = require('@prisma/client')
 const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
-const DRAIN_LOCATIONS = [
-  { lat: 5.6508, lng: -0.1869, severity: 'HIGH',     desc: 'Completely blocked with plastic bags near Legon bus stop' },
-  { lat: 5.6800, lng: -0.1660, severity: 'CRITICAL', desc: 'Drain overflowing, water on road surface — Madina market' },
-  { lat: 5.6345, lng: -0.1567, severity: 'MEDIUM',   desc: 'Partial blockage near East Legon residential' },
-  { lat: 5.7100, lng: -0.1680, severity: 'LOW',      desc: 'Minor accumulation of leaves — Adenta' },
-  { lat: 5.6050, lng: -0.1670, severity: 'HIGH',     desc: 'Plastic bottles blocking outflow — Airport Hills' },
-  { lat: 5.5830, lng: -0.1190, severity: 'MEDIUM',   desc: 'Mixed waste partially covering drain — Teshie' },
-  { lat: 5.6200, lng: -0.1800, severity: 'CRITICAL', desc: 'Large blockage causing surface flooding — Ring Road' },
-  { lat: 5.6650, lng: -0.1750, severity: 'HIGH',     desc: 'Construction debris blocking drain — Cantonments' },
-  { lat: 5.6480, lng: -0.1820, severity: 'LOW',      desc: 'Seasonal leaf buildup — Roman Ridge' },
-  { lat: 5.6900, lng: -0.1550, severity: 'MEDIUM',   desc: 'Organic waste accumulation — Haatso' },
+const ISSUE_LOCATIONS = [
+  { lat: 5.6508, lng: -0.1869, severity: 'HIGH',     category: 'CLOGGED_DRAIN',    desc: 'Completely blocked with plastic bags near Legon bus stop' },
+  { lat: 5.6800, lng: -0.1660, severity: 'CRITICAL', category: 'OVERFLOWING_BIN',  desc: 'Market bin overflowing onto the road — Madina market' },
+  { lat: 5.6345, lng: -0.1567, severity: 'MEDIUM',   category: 'CLOGGED_DRAIN',    desc: 'Partial blockage near East Legon residential' },
+  { lat: 5.7100, lng: -0.1680, severity: 'LOW',      category: 'CLOGGED_DRAIN',    desc: 'Minor accumulation of leaves — Adenta' },
+  { lat: 5.6050, lng: -0.1670, severity: 'HIGH',     category: 'ILLEGAL_DUMPING',  desc: 'Plastic bottles dumped beside the curb — Airport Hills' },
+  { lat: 5.5830, lng: -0.1190, severity: 'MEDIUM',   category: 'OVERFLOWING_BIN',  desc: 'Public bin overflowing at Teshie Junction' },
+  { lat: 5.6200, lng: -0.1800, severity: 'CRITICAL', category: 'CLOGGED_DRAIN',    desc: 'Large blockage causing surface flooding — Ring Road' },
+  { lat: 5.6650, lng: -0.1750, severity: 'HIGH',     category: 'ILLEGAL_DUMPING',  desc: 'Construction debris dumped at the roadside — Cantonments' },
+  { lat: 5.6480, lng: -0.1820, severity: 'LOW',      category: 'CLOGGED_DRAIN',    desc: 'Seasonal leaf buildup — Roman Ridge' },
+  { lat: 5.6900, lng: -0.1550, severity: 'MEDIUM',   category: 'ILLEGAL_DUMPING',  desc: 'Organic waste dumped in an open lot — Haatso' },
 ]
 
 async function main() {
   console.log('🌱 Seeding GreenPulse database...\n')
   const hash = await bcrypt.hash('password123', 12)
+
+  // ── Collection zones / QR bins ──
+  const zones = [
+    { id: 'legon-main', name: 'Legon Main Road', lat: 5.6508, lng: -0.1869, currentVolumeKg: 68, collectionDay: 'Tuesday' },
+    { id: 'madina-market', name: 'Madina Market', lat: 5.6800, lng: -0.1660, currentVolumeKg: 112, collectionDay: 'Wednesday' },
+    { id: 'east-legon', name: 'East Legon Avenue', lat: 5.6345, lng: -0.1567, currentVolumeKg: 45, collectionDay: 'Thursday' },
+    { id: 'adenta-housing', name: 'Adenta Housing', lat: 5.7100, lng: -0.1680, currentVolumeKg: 82, collectionDay: 'Friday' },
+    { id: 'airport-hills', name: 'Airport Hills', lat: 5.6050, lng: -0.1670, currentVolumeKg: 96, collectionDay: 'Monday' },
+    { id: 'teshie-junction', name: 'Teshie Junction', lat: 5.5830, lng: -0.1190, currentVolumeKg: 35, collectionDay: 'Saturday' },
+  ]
+  await Promise.all(zones.map(zone => prisma.zone.upsert({ where: { id: zone.id }, update: {}, create: zone })))
+  console.log(`✅ ${zones.length} QR collection zones created`)
 
   // ── Collectors ──
   const collectors = await Promise.all([
@@ -59,6 +71,28 @@ async function main() {
   console.log(`✅ ${recyclers.length} recyclers created`)
   console.log('   Login: phone=0302000001, password=password123\n')
 
+  // ── Residents ──
+  const residents = await Promise.all([
+    prisma.resident.upsert({
+      where: { email: 'ama@greenpulse.gh' }, update: {},
+      create: { firstName: 'Ama', lastName: 'Owusu', email: 'ama@greenpulse.gh', password: hash, zoneId: 'east-legon', greenPoints: 180 },
+    }),
+    prisma.resident.upsert({
+      where: { email: 'yaw@greenpulse.gh' }, update: {},
+      create: { firstName: 'Yaw', lastName: 'Mensah', email: 'yaw@greenpulse.gh', password: hash, zoneId: 'madina-market', greenPoints: 95 },
+    }),
+  ])
+  console.log(`✅ ${residents.length} residents created`)
+  console.log('   Login: email=ama@greenpulse.gh, password=password123\n')
+
+  await prisma.cityAdmin.upsert({
+    where: { email: 'admin@greenpulse.gh' },
+    update: {},
+    create: { name: 'AMA Operations', email: 'admin@greenpulse.gh', password: hash, agency: 'Accra Metropolitan Assembly' },
+  })
+  console.log(`✅ City admin created`)
+  console.log('   Login: email=admin@greenpulse.gh, password=password123\n')
+
   // ── Tricycles ──
   const tricycleData = [
     { driverName: 'Ebo Quartey',    phone: '0554000001', zone: 'East Legon',  capacityKg: 250, lat: 5.6350, lng: -0.1567 },
@@ -78,23 +112,25 @@ async function main() {
   }
   console.log(`✅ ${tricycleCount} tricycles created\n`)
 
-  // ── Drain Reports ──
+  // ── Issue Reports ──
   const wasteTypes = ['PLASTIC', 'ORGANIC', 'MIXED', 'PLASTIC', 'EWASTE', 'MIXED', 'PLASTIC', 'ORGANIC', 'MIXED', 'PLASTIC']
   const reports = []
-  for (let i = 0; i < DRAIN_LOCATIONS.length; i++) {
-    const loc = DRAIN_LOCATIONS[i]
-    const isClear = i < 6 // first 6 will be cleared so they appear on marketplace
+  for (let i = 0; i < ISSUE_LOCATIONS.length; i++) {
+    const loc = ISSUE_LOCATIONS[i]
+    const isClear = i < 6
     const report = await prisma.drainReport.create({
       data: {
         lat: loc.lat, lng: loc.lng,
-        photoUrl: `https://placehold.co/800x600/D8F3DC/1B4332?text=${loc.severity}+Drain`,
-        severity: loc.severity, description: loc.desc,
+        photoUrl: `https://placehold.co/800x600/D8F3DC/1B4332?text=${loc.category}`,
+        category: loc.category, severity: loc.severity, description: loc.desc,
         status: isClear ? 'CLEARED' : 'PENDING',
+        residentId: residents[i % residents.length].id,
+        reportedBy: residents[i % residents.length].id,
       },
     })
     reports.push({ ...report, wasteType: wasteTypes[i] })
   }
-  console.log(`✅ ${reports.length} drain reports created`)
+  console.log(`✅ ${reports.length} issue reports created`)
 
   // ── Waste Collections (for cleared reports → listed on marketplace) ──
   const CO2_FACTORS = { PLASTIC: 2.5, ORGANIC: 0.8, MIXED: 1.5, EWASTE: 5.0 }
@@ -127,6 +163,8 @@ async function main() {
   console.log('═══════════════════════════════════════════')
   console.log('✅ Seed complete!')
   console.log('\n📋 Test Accounts:')
+  console.log('  Resident:   email=ama@greenpulse.gh  password=password123')
+  console.log('  City admin: email=admin@greenpulse.gh  password=password123')
   console.log('  Collector:  phone=0244000001  password=password123')
   console.log('  Recycler:   phone=0302000001  password=password123')
   console.log('\n🛺 Tricycles: 6 available across Accra zones')

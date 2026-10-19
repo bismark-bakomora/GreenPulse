@@ -1,3 +1,9 @@
+export const ISSUE_CATEGORIES = {
+  OVERFLOWING_BIN: { label: 'Overflowing bin',       defaultSeverity: 'MEDIUM' },
+  ILLEGAL_DUMPING: { label: 'Illegal dumping',       defaultSeverity: 'HIGH' },
+  CLOGGED_DRAIN:   { label: 'Clogged drain / gutter', defaultSeverity: 'HIGH' },
+}
+
 export const SEVERITY_LEVELS = {
   LOW:      { label: 'Low',      color: '#74C69D', bg: '#D8F3DC' },
   MEDIUM:   { label: 'Medium',   color: '#F4A261', bg: '#FFF3E0' },

@@ -22,9 +22,9 @@ try:
     G = ox.graph_from_place("Accra, Ghana", network_type="drive")
     G = ox.add_edge_speeds(G)
     G = ox.add_edge_travel_times(G)
-    print("✅ Road network loaded.")
+    print("Road network loaded.")
 except Exception as e:
-    print(f"⚠️  OSM unavailable ({e}). Using haversine fallback.")
+    print(f"OSM unavailable ({e}). Using haversine fallback.")
 
 
 class Target(BaseModel):

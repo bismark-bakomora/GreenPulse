@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { motion } from 'framer-motion'
-import { AlertTriangle, CheckCircle, Users, Leaf, Activity, CloudRain, Recycle } from 'lucide-react'
-import { dashboardAPI, weatherAPI } from '../lib/api'
+import { AlertTriangle, CheckCircle, Users, Activity, CloudRain, Recycle, Download } from 'lucide-react'
+import { dashboardAPI, weatherAPI, zoneAPI } from '../lib/api'
 import { ACCRA_CENTER, ACCRA_ZOOM } from '../lib/constants'
 
 function PulseCounter({ value, unit, label }) {
@@ -22,6 +22,15 @@ const WASTE_COLORS = { PLASTIC: '#3B82F6', ORGANIC: '#8B4513', MIXED: '#6B7280',
 export default function AdminDashboard() {
   const { data: summary, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: () => dashboardAPI.getSummary().then(r => r.data), refetchInterval: 60000 })
   const { data: weather } = useQuery({ queryKey: ['weather'], queryFn: () => weatherAPI.getForecast().then(r => r.data) })
+  const { data: zones = [] } = useQuery({ queryKey: ['zones'], queryFn: () => zoneAPI.getAll().then(r => r.data), refetchInterval: 60000 })
+
+  const exportReport = () => {
+    const report = { generatedAt: new Date().toISOString(), cityImpact: summary, zones }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url; link.download = `greenpulse-impact-report-${new Date().toISOString().slice(0, 10)}.json`; link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const pieData = summary?.byType?.map(t => ({ name: t.wasteType, value: parseFloat((t._sum?.weightKg || 0).toFixed(1)) })) || []
   const weeklyData = summary?.recentCollections?.slice(0, 7).map(c => ({
@@ -37,12 +46,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
         <div className="flex items-center gap-2 text-gp-jade text-sm font-medium mb-2">
           <Activity className="w-4 h-4" /><span>Live — updates every 60 seconds</span><span className="w-2 h-2 bg-gp-mint rounded-full animate-pulse" />
         </div>
         <h1 className="font-display font-bold text-3xl text-gp-slate">City Operations Dashboard</h1>
         <p className="text-gp-grey">Real-time waste intelligence for Accra Metropolitan Assembly</p>
+        </div>
+        <button onClick={exportReport} className="btn-secondary text-sm py-2 px-3 flex items-center gap-2"><Download className="w-4 h-4" /> Export impact report</button>
       </div>
 
       <div className="bg-gp-slate rounded-3xl p-8 mb-8 relative overflow-hidden">
@@ -79,7 +91,7 @@ export default function AdminDashboard() {
                 const colors = { LOW: '#74C69D', MEDIUM: '#F4A261', HIGH: '#E63946', CRITICAL: '#9B1D1D' }
                 return <CircleMarker key={r.id} center={[r.lat, r.lng]} radius={r.severity === 'HIGH' || r.severity === 'CRITICAL' ? 14 : 8}
                   fillColor={colors[r.severity] || '#74C69D'} color="white" weight={2} fillOpacity={0.85}>
-                  <Popup><strong>{r.severity}</strong><br />{r.description || 'No description'}<br />Status: {r.status}</Popup>
+                  <Popup><strong>{r.category?.replaceAll('_', ' ') || r.severity}</strong><br />{r.description || 'No description'}<br />Status: {r.status}</Popup>
                 </CircleMarker>
               })}
             </MapContainer>
@@ -99,6 +111,13 @@ export default function AdminDashboard() {
               </div>
             )) || <p className="text-gp-grey text-sm">Weather data loading...</p>}
           </div>
+        </div>
+      </div>
+
+      <div className="card mb-8">
+        <h2 className="font-display font-semibold text-gp-slate mb-4">Zone Threshold & Dispatch Status</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {zones.map(zone => <div key={zone.id} className="rounded-xl border border-gray-100 p-4"><div className="flex justify-between gap-2"><span className="font-medium text-sm text-gp-slate">{zone.name}</span><span className={`text-xs font-semibold ${zone.status === 'READY_FOR_COLLECTION' ? 'text-amber-600' : 'text-gp-emerald'}`}>{zone.status === 'READY_FOR_COLLECTION' ? 'Dispatch ready' : 'Open'}</span></div><div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden"><div className={zone.status === 'READY_FOR_COLLECTION' ? 'h-full bg-amber-400' : 'h-full bg-gp-emerald'} style={{ width: `${zone.fillPercent}%` }} /></div><p className="text-xs text-gp-grey mt-2">{zone.currentVolumeKg.toFixed(1)} / {zone.thresholdKg.toFixed(0)} kg · Collection: {zone.collectionDay || 'TBD'}</p></div>)}
         </div>
       </div>
 

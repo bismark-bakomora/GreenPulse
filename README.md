@@ -1,225 +1,202 @@
-# GreenPulse 🌿
-### Ghana's First Integrated Waste Intelligence Ecosystem
-**Global Challenge Lab 2026 | Smart Cities Track | University of Ghana, Legon**
+# GreenPulse 
+
+Ghana's integrated waste intelligence ecosystem — a small-platform demonstrating citizen reporting, collector workflows, recycler marketplace, and city dashboards for flood and waste management.
 
 ---
 
-## Project Structure
-
-```
-greenpulse/
-├── greenpulse-frontend/     ← React + Vite  (deploy to Vercel)
-├── greenpulse-backend/      ← Node.js + Express + Prisma  (deploy to Render)
-└── greenpulse-routing/      ← Python + FastAPI  (deploy to Render)
-```
-
----
-
-## Five User Roles
-
-| Role | Entry Point | What they do |
-|------|------------|--------------|
-| **Citizen** | `/report` | Scan QR code, report choked drain, earn GreenPoints |
-| **Collector** | `/login` | Accept drain jobs, clear waste, log weight → auto-listed on marketplace |
-| **Recycler** | `/recycler/login` | Browse sorted waste, place orders, dispatch tricycles |
-| **City Admin** | `/dashboard` | View live heatmap, KPIs, flood-risk forecasts |
-| **Any visitor** | `/` | Landing page, /recycler info portal |
+## Contents
+- Project overview
+- Features
+- Tech stack
+- Quick start (local)
+- Environment variables
+- Project structure (file-by-file descriptions)
+- API summary
+- Deployment
+- Contributing & contacts
 
 ---
 
-## Quick Start (Local Development)
+## Project overview
 
-### 1. Prerequisites
+GreenPulse connects Citizens, Collectors, Recyclers, and City Admins to reduce flooding and improve waste recovery. Citizens report blocked drains; Collectors clear and log waste; Recyclers buy sorted waste; Admins monitor KPIs and heatmaps.
+
+## Features
+- QR-based citizen reporting with photo uploads
+- Collector mobile-first app: accept jobs, optimized routing, log weight
+- Recycler marketplace for listed waste batches and tricycle dispatch
+- Admin dashboard: heatmap, KPIs, weather forecasts, CO₂ pulse
+- Authentication for collectors and recyclers, role-based flows
+- Prisma-powered Postgres schema and seed data
+
+## Tech stack
+- Frontend: React + Vite, Tailwind CSS
+- Backend: Node.js + Express, Prisma ORM, PostgreSQL
+- Routing/optimizer: Python (FastAPI / uvicorn) — optional service
+- Third-party: Cloudinary (images), Mapbox/Leaflet (maps), external weather API
+
+---
+
+## Quick start (Local Development)
+
+Prereqs:
 ```bash
-node --version   # need v18+
-python --version # need v3.10+
+node --version   # v18+
+npm --version
+python --version # 3.10+ for routing service (optional)
 ```
 
-### 2. Clone & set up all three repos
+Install & run backend (from repo root `backend/`):
 ```bash
-mkdir greenpulse && cd greenpulse
-
-git clone https://github.com/aggreypaintsil168/greenpulse-frontend.git
-git clone https://github.com/aggreypaintsil168/greenpulse-backend.git
-git clone https://github.com/aggreypaintsil168/greenpulse-routing.git
-```
-
-### 3. Backend setup
-```bash
-cd greenpulse-backend
+cd backend
 npm install
-
-# Copy env file and fill in your values
-cp .env.example .env
-# Edit .env: add your Neon DATABASE_URL, Cloudinary keys
-
+cp .env.example .env   # fill DB, Cloudinary, JWT_SECRET, FRONTEND_URL
 npx prisma generate
 npx prisma db push
-npm run seed        # loads test data including recyclers + tricycles
-
-npm run dev         # starts on http://localhost:3001
+node prisma/seed.js    # optional: seed local data
+node server.js         # or `npm run dev` if script exists
 ```
 
-### 4. Frontend setup
+Install & run frontend (from repo root `frontend/`):
 ```bash
-cd ../greenpulse-frontend
+cd frontend
 npm install
-
-cp .env.example .env
-# .env already points to localhost:3001 by default
-
-npm run dev         # starts on http://localhost:5173
+cp .env.example .env   # set VITE_API_URL if needed
+npm run dev
 ```
 
-### 5. Routing service (optional — backend has fallback)
+Routing service (optional):
 ```bash
-cd ../greenpulse-routing
+cd routing
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
+Open frontend in browser (Vite default): http://localhost:5173 and backend API at http://localhost:3001 (default)
+
 ---
 
-## Environment Variables
+## Environment variables (summary)
 
-### Backend `.env`
+Backend (`backend/.env`)
 ```
-DATABASE_URL="postgresql://USER:PASS@HOST/greenpulse?sslmode=require"
-JWT_SECRET="greenpulse_super_secret_2026_gcl"
+DATABASE_URL=postgres://USER:PASS@HOST:PORT/DB
+JWT_SECRET=...          # used to sign tokens
 PORT=3001
-CLOUDINARY_CLOUD_NAME="..."
-CLOUDINARY_API_KEY="..."
-CLOUDINARY_API_SECRET="..."
-FRONTEND_URL="http://localhost:5173"
-ROUTING_SERVICE_URL="http://localhost:8000"
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+FRONTEND_URL=http://localhost:5173
+ROUTING_SERVICE_URL=http://localhost:8000
 ```
 
-### Frontend `.env`
+Frontend (`frontend/.env`)
 ```
 VITE_API_URL=http://localhost:3001/api
 ```
 
----
-
-## Test Accounts (after seeding)
-
-| Role | Phone | Password |
-|------|-------|----------|
-| Collector | 0244000001 | password123 |
-| Collector | 0244000002 | password123 |
-| Recycler (Plastic) | 0302000001 | password123 |
-| Recycler (Organic) | 0302000002 | password123 |
-| Recycler (E-Waste) | 0302000003 | password123 |
+Routing (`routing/requirements.txt`)
+- See `routing/main.py` for expected envs if any (service URL, API keys).
 
 ---
 
-## API Endpoints
+## Project structure and file descriptions
 
-### Reports
-```
-POST   /api/reports                   Submit drain report (+ photo)
-GET    /api/reports                   All active reports
-GET    /api/reports/heatmap           Lat/lng intensity array
-GET    /api/reports/available-waste   Cleared waste for recyclers
-PATCH  /api/reports/:id               Update status
-```
+Top-level layout (workspace root):
 
-### Collections
 ```
-POST   /api/collections               Log waste collection (auth)
-GET    /api/collections/stats         Aggregate totals
-GET    /api/collections/available     Unsold batches for marketplace
-GET    /api/collections/collector/:id By collector ID
+README.md
+backend/
+frontend/
+routing/
+cache/
 ```
 
-### Auth
-```
-POST   /api/auth/collector/register
-POST   /api/auth/collector/login
-POST   /api/auth/recycler/register
-POST   /api/auth/recycler/login
-```
+backend/ (Node.js + Express + Prisma)
+- `package.json` — backend dependencies and scripts.
+- `server.js` — application entrypoint: Express app, middleware mounting, port listen.
+- `prisma.config.ts` — local Prisma configuration utilities (if present).
+- `lib/cloudinary.js` — Cloudinary helper for uploading images and building URLs.
+- `middleware/auth.js` — JWT authentication middleware and role checks used by protected routes.
+- `prisma/schema.prisma` — Prisma schema defining `User`, `Report`, `WasteCollection`, `Tricycle`, `Order`, etc.
+- `prisma/seed.js` — seed script that creates initial users, recyclers, tricycles, and sample reports.
+- `routes/` — Express routers; each file maps endpoints and business logic:
+  - `auth.js` — collector/recycler registration and login endpoints (JWT issuance).
+  - `collections.js` — endpoints for logging waste collections, marketplace flags, stats.
+  - `collectors.js` — collector-specific endpoints (jobs, status, profile).
+  - `dashboard.js` — admin KPIs, heatmap data, summary endpoints.
+  - `recyclers.js` — marketplace browsing, orders, dispatch endpoints.
+  - `reports.js` — create/update drain reports, upload images, fetch heatmap points.
+  - `routing.js` — proxy / integration to routing optimizer (calls the routing service).
+  - `weather.js` — fetches external weather/forecast data and returns rainfall risk.
 
-### Recyclers (new)
-```
-GET    /api/recyclers/marketplace     Browse available waste (filter by type)
-GET    /api/recyclers/tricycles/available  Live tricycle map
-POST   /api/recyclers/orders          Place purchase order
-GET    /api/recyclers/:id/orders      My orders
-POST   /api/recyclers/dispatch        Assign tricycle to order
-GET    /api/recyclers/:id/dispatches  My dispatches
-PATCH  /api/recyclers/dispatches/:id  Update dispatch status
-```
+Notes: Static helpers and business logic may live in `lib/` or sibling modules. Look for `api` utilities for external service calls.
 
-### Dashboard & Utilities
-```
-GET    /api/dashboard/summary         Full KPI summary
-POST   /api/routing/optimize          Dijkstra route optimization
-GET    /api/weather/forecast          7-day Accra rainfall forecast
-```
+frontend/ (React + Vite)
+- `package.json` — frontend dependencies and scripts.
+- `vite.config.js` — Vite config and dev server proxy (if configured to backend).
+- `tailwind.config.js` & `postcss.config.js` — Tailwind setup.
+- `index.html` — Vite HTML entry.
+- `src/main.jsx` — React DOM bootstrap.
+- `src/App.jsx` — top-level routes and app shell.
+- `src/index.css` — global styles (Tailwind imports).
+- `src/lib/api.js` — API wrapper that calls backend endpoints using `VITE_API_URL`.
+- `src/lib/constants.js` — shared constants (roles, status codes).
+- `src/pages/` — route pages:
+  - `LandingPage.jsx` — public landing and info
+  - `CollectorApp.jsx`, `CollectorLogin.jsx` — collector flows
+  - `RecyclerDashboard.jsx`, `RecyclerLogin.jsx`, `RecyclerPortal.jsx` — recycler flows
+  - `AdminDashboard.jsx` — admin heatmap & KPIs
+  - `CitizenReport.jsx` — QR scan + report submit UI
+  - `GreenCV.jsx` — collector work history view
+  - `NotFound.jsx` — 404 page
+  - `QRZones.jsx` — QR zone management / preview (also a top-level file `QRZones.jsx` exists)
+- `src/components/Layout.jsx` — layout wrapper and shared header/nav.
+
+Public/static assets are in `frontend/public` and `frontend/src/assets`.
+
+routing/ (optional Python service)
+- `main.py` — FastAPI app providing route optimization endpoints and helpers (Dijkstra or routing heuristics).
+- `requirements.txt` — Python dependencies (FastAPI, uvicorn, networkx, etc.).
+
+cache/
+- JSON files used for caching third-party responses (forecast, map tiles, or precomputed routing). Safe to clear during development.
+
+Other notable files at workspace root
+- `README.md` — this file.
 
 ---
 
-## Deployment
+## API summary (selected endpoints)
+- `POST /api/reports` — Submit a drain report (multipart: image + metadata)
+- `GET /api/reports/heatmap` — Returns heatmap points for dashboard
+- `POST /api/collections` — Collector logs a cleared waste batch
+- `GET /api/recyclers/marketplace` — Recycler lists available batches
+- Auth: `POST /api/auth/collector/login`, `POST /api/auth/recycler/login`
+- Dashboard: `GET /api/dashboard/summary`
 
-### Frontend → Vercel
-1. `vercel.com` → Add New Project → Import `greenpulse-frontend`
-2. Framework: Vite (auto-detected)
-3. Environment variable: `VITE_API_URL=https://your-backend.onrender.com/api`
-4. Deploy → get URL like `https://greenpulse-frontend.vercel.app`
-
-### Backend → Render
-1. `render.com` → New Web Service → Connect `greenpulse-backend`
-2. Build: `npm install && npx prisma generate`
-3. Start: `node server.js`
-4. Add all `.env` variables in Render dashboard
-5. Deploy → get URL like `https://greenpulse-api.onrender.com`
-
-### Routing Service → Render
-1. New Web Service → Connect `greenpulse-routing`
-2. Build: `pip install -r requirements.txt`
-3. Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-4. Add `ROUTING_SERVICE_URL` to backend env vars
-
-### After deploying backend:
-- Go back to Vercel → Update `VITE_API_URL` to your Render URL → Redeploy
-- Run seed on production: In Render shell → `node prisma/seed.js`
+Refer to `backend/routes/` for full, up-to-date endpoint details.
 
 ---
 
-## Recycler Feature Flow
+## Deployment notes
+- Frontend: Deploy `frontend/` to Vercel or Netlify (set `VITE_API_URL` to production backend).
+- Backend: Deploy `backend/` to Render, Heroku, or any Node host. Ensure `DATABASE_URL` and Cloudinary envs are set. Run `npx prisma migrate` / `prisma db push` as appropriate.
+- Routing: Deploy `routing/` as a separate service (optional). Update `ROUTING_SERVICE_URL` in backend envs.
 
-```
-1. Collector clears drain → logs weight + waste type
-   → WasteCollection created with listedOnMarket=true
-
-2. Recycler logs in → browses /recycler/dashboard → Marketplace tab
-   → Sees available batches filtered by their recycler type
-   → Places an order (sets price per kg, quantity)
-   → WasteCollection marked soldToRecycler=true
-
-3. Recycler → Tricycle Dispatch tab
-   → Views live map of available tricycles
-   → Selects a tricycle → clicks Dispatch
-   → TricycleDispatch created, tricycle marked unavailable
-
-4. Tricycle driver collects waste → Recycler updates dispatch to COLLECTED
-5. Delivery confirmed → status → DELIVERED, tricycle freed
-
-6. Dashboard shows recyclerOrders count for AMA reporting
-```
+Security: Rotate `JWT_SECRET` and Cloudinary keys for production. Use HTTPS and restrict CORS to your frontend domain.
 
 ---
 
-## Demo Flow (Day 14 Pitch)
+## Contributing
+- To add features or fix bugs: open a branch, add tests where appropriate, and submit a PR.
+- Seed and demo data live in `backend/prisma/seed.js` — use this to bootstrap test accounts.
 
-1. **Landing page** — show the full value chain diagram (Citizen → Collector → Recycler → City)
-2. **Citizen report** — live QR scan simulation, submit a drain report
-3. **Collector app** — accept job, show optimized route, log 15kg plastic
-4. **Recycler dashboard** — show plastic batch appearing on marketplace, place order, dispatch tricycle
-5. **Admin dashboard** — live CO₂ pulse counter, heatmap, recycler order count
-6. **Green CV** — show collector's verified work history
+## Contact
+Built by Ishmeal Aggrey Paintsil (University of Ghana, GCL 2026). For questions, open an issue or contact the maintainer in the repository.
 
 ---
 
-*Built by Ishmeal Aggrey Paintsil | University of Ghana, Legon | GCL 2026*
+If you'd like, I can also:
+- generate an `ARCHITECTURE.md` with diagrams, or
+- add a small `DEVELOPMENT.md` with step-by-step commands and common troubleshooting tips.

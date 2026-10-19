@@ -21,6 +21,9 @@ app.use('/api/recyclers',   require('./routes/recyclers'))
 app.use('/api/dashboard',   require('./routes/dashboard'))
 app.use('/api/routing',     require('./routes/routing'))
 app.use('/api/weather',     require('./routes/weather'))
+app.use('/api/zones',       require('./routes/zones'))
+app.use('/api/residents',   require('./routes/residents'))
+app.use('/api/pickups',     require('./routes/pickups'))
 
 app.get('/api/health', (_, res) => {
   res.json({ status: 'GreenPulse API is live 🌿', timestamp: new Date().toISOString() })

@@ -28,12 +28,12 @@ export default function QRZones() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="font-display font-bold text-3xl text-gp-slate mb-2">QR Zone Codes</h1>
-        <p className="text-gp-grey">Print these and attach to drain covers. Citizens scan → report form opens pre-filled with the zone location and earns GreenPoints.</p>
+        <p className="text-gp-grey">Print these and attach to bins or drain covers. Residents scan → report form opens pre-filled with the zone location and earns GreenPoints.</p>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {ZONES.map((zone, i) => {
-          const reportUrl = `${BASE_URL}/report?zone=${zone.id}&lat=${zone.lat}&lng=${zone.lng}&name=${encodeURIComponent(zone.name)}`
+          const reportUrl = `${BASE_URL}/resident?view=report&zone=${zone.id}&lat=${zone.lat}&lng=${zone.lng}&name=${encodeURIComponent(zone.name)}`
           return (
             <motion.div key={zone.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.07 }} className="card text-center hover:shadow-md transition-shadow">

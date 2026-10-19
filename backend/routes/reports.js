@@ -19,22 +19,36 @@ const uploadToCloud = (buffer, folder) =>
 // POST /api/reports
 router.post('/', upload.single('photo'), async (req, res) => {
   try {
-    const { lat, lng, severity = 'MEDIUM', description = '' } = req.body
+    const { lat, lng, severity = 'MEDIUM', description = '', category = 'CLOGGED_DRAIN', residentId } = req.body
     if (!lat || !lng) return res.status(400).json({ error: 'Location is required' })
+    const allowed = ['OVERFLOWING_BIN', 'ILLEGAL_DUMPING', 'CLOGGED_DRAIN']
+    const issueCategory = allowed.includes(category) ? category : 'CLOGGED_DRAIN'
 
-    let photoUrl = `https://placehold.co/800x600/D8F3DC/1B4332?text=${severity}+Drain+Report`
+    let photoUrl = `https://placehold.co/800x600/D8F3DC/1B4332?text=${issueCategory}`
     if (req.file) {
       const result = await uploadToCloud(req.file.buffer, 'greenpulse/reports')
       photoUrl = result.secure_url
     }
 
     const report = await prisma.drainReport.create({
-      data: { lat: parseFloat(lat), lng: parseFloat(lng), photoUrl, severity, description },
+      data: {
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        photoUrl,
+        category: issueCategory,
+        severity,
+        description,
+        reportedBy: residentId || 'anonymous',
+        residentId: residentId || null,
+      },
     })
 
     await prisma.greenPointsLedger.create({
-      data: { citizenId: 'anonymous', points: 5, reason: 'Drain report submitted', reportId: report.id },
+      data: { citizenId: residentId || 'anonymous', points: 5, reason: 'Issue report submitted', reportId: report.id },
     })
+    if (residentId) {
+      await prisma.resident.update({ where: { id: residentId }, data: { greenPoints: { increment: 5 } } }).catch(() => {})
+    }
 
     res.status(201).json({ ...report, pointsEarned: 5 })
   } catch (err) {

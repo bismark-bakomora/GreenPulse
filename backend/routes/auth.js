@@ -74,4 +74,20 @@ router.post('/recycler/login', async (req, res) => {
   }
 })
 
+// ── CITY ADMIN AUTH ──
+
+router.post('/admin/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    const admin = await prisma.cityAdmin.findUnique({ where: { email: email?.toLowerCase() } })
+    if (!admin) return res.status(404).json({ error: 'No city admin account found with this email' })
+    const match = await bcrypt.compare(password, admin.password)
+    if (!match) return res.status(401).json({ error: 'Incorrect password' })
+    const { password: _, ...safe } = admin
+    res.json({ admin: safe, token: sign({ id: admin.id, name: admin.name, role: 'admin' }) })
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed' })
+  }
+})
+
 module.exports = router

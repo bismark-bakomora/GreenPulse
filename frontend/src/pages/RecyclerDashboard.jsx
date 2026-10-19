@@ -303,6 +303,7 @@ export default function RecyclerDashboard() {
                               <input type="number" min="1" max={batch.weightKg} step="0.5"
                                 value={orderForm.requestedKg}
                                 onChange={e => setOrderForm({ ...orderForm, requestedKg: e.target.value })}
+                                onClick={e => e.stopPropagation()}
                                 placeholder={`Up to ${batch.weightKg}kg`} className="input-field text-sm py-2" />
                             </div>
                             <div>
@@ -310,6 +311,7 @@ export default function RecyclerDashboard() {
                               <input type="number" min="0.1" step="0.1"
                                 value={orderForm.pricePerKgGHS}
                                 onChange={e => setOrderForm({ ...orderForm, pricePerKgGHS: e.target.value })}
+                                onClick={e => e.stopPropagation()}
                                 placeholder={`Market: GHS ${price}`} className="input-field text-sm py-2" />
                             </div>
                             {orderForm.requestedKg && orderForm.pricePerKgGHS && (

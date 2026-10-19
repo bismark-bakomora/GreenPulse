@@ -1,9 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Leaf, Star, Award, TrendingUp, Scale, Droplets, Calendar, ArrowLeft, Share2 } from 'lucide-react'
+import { Star, Award, TrendingUp, Scale, Droplets, Calendar, ArrowLeft, Share2 } from 'lucide-react'
 import { collectorAPI } from '../lib/api'
 import toast from 'react-hot-toast'
+import logo from '../assets/logo.png'
 
 const WASTE_COLORS = {
   PLASTIC: 'bg-blue-100 text-blue-600',
@@ -58,9 +59,7 @@ export default function GreenCV() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gp-mint/10 rounded-full blur-2xl" />
         <div className="flex items-start justify-between mb-6">
           <div>
-            <div className="w-16 h-16 bg-gp-mint/20 rounded-2xl flex items-center justify-center mb-3">
-              <Leaf className="w-8 h-8 text-gp-mint" />
-            </div>
+            <img src={logo} alt="GreenPulse" className="w-16 h-16 rounded-2xl object-cover mb-3" />
             <h1 className="font-display font-bold text-2xl">{collector.name}</h1>
             <p className="text-white/60 text-sm">Waste Collector · {collector.zone || 'Greater Accra'}</p>
           </div>

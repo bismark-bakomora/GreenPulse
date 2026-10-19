@@ -67,6 +67,22 @@ router.get('/tricycles/available', async (req, res) => {
   }
 })
 
+// Demand signals help residents and collectors prioritise material recyclers need.
+router.get('/demands', async (_, res) => {
+  try {
+    res.json(await prisma.materialDemand.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }))
+  } catch { res.status(500).json({ error: 'Failed to fetch material demand' }) }
+})
+
+router.post('/demands', auth, async (req, res) => {
+  try {
+    const { recyclerId, material, targetKg, incentive = 0 } = req.body
+    if (!recyclerId || !material || !targetKg) return res.status(400).json({ error: 'Recycler, material, and target volume are required' })
+    const demand = await prisma.materialDemand.create({ data: { recyclerId, material, targetKg: Number(targetKg), incentive: Number(incentive) } })
+    res.status(201).json(demand)
+  } catch { res.status(500).json({ error: 'Failed to create material demand' }) }
+})
+
 // GET /api/recyclers/:id — recycler profile
 router.get('/:id', async (req, res) => {
   try {

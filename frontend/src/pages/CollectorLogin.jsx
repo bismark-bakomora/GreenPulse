@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Leaf, Phone, Lock, Loader2, UserPlus } from 'lucide-react'
+import { Phone, Lock, Loader2, UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authAPI } from '../lib/api'
 import { motion } from 'framer-motion'
+import logo from '../assets/logo.png'
 
 export default function CollectorLogin() {
   const [mode, setMode] = useState('login')
@@ -39,9 +40,7 @@ export default function CollectorLogin() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-gp-foam rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Leaf className="w-7 h-7 text-gp-emerald" />
-          </div>
+          <img src={logo} alt="GreenPulse" className="w-14 h-14 rounded-2xl object-cover mx-auto mb-4" />
           <h1 className="font-display font-bold text-2xl text-gp-slate">Collector Portal</h1>
           <p className="text-gp-grey text-sm mt-1">{mode === 'login' ? 'Sign in to see active jobs' : 'Create your collector account'}</p>
         </div>

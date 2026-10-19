@@ -8,7 +8,7 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('gp_token') || localStorage.getItem('gp_recycler_token')
+  const token = localStorage.getItem('gp_token') || localStorage.getItem('gp_recycler_token') || localStorage.getItem('gp_resident_token') || localStorage.getItem('gp_admin_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -33,6 +33,7 @@ export const authAPI = {
   collectorRegister: (d) => api.post('/auth/collector/register', d),
   recyclerLogin:     (d) => api.post('/auth/recycler/login', d),
   recyclerRegister:  (d) => api.post('/auth/recycler/register', d),
+  adminLogin:        (d) => api.post('/auth/admin/login', d),
 }
 
 export const collectorAPI = {
@@ -50,10 +51,36 @@ export const recyclerAPI = {
   getDispatches:     (id) => api.get(`/recyclers/${id}/dispatches`),
   updateDispatch:    (id, d) => api.patch(`/recyclers/dispatches/${id}`, d),
   getAvailableTricycles: () => api.get('/recyclers/tricycles/available'),
+  getDemands:          () => api.get('/recyclers/demands'),
+  createDemand:        (d) => api.post('/recyclers/demands', d),
 }
 
 export const dashboardAPI = {
   getSummary: () => api.get('/dashboard/summary'),
+}
+
+export const zoneAPI = {
+  getAll:       () => api.get('/zones'),
+  get:          (id) => api.get(`/zones/${id}`),
+  campaign:     (id, data) => api.post(`/zones/${id}/campaigns`, data),
+}
+
+export const residentAPI = {
+  register:     (data) => api.post('/residents/register', data),
+  login:        (data) => api.post('/residents/login', data),
+  getProfile:   (id) => api.get(`/residents/${id}`),
+  logDropoff:   (id, data) => api.post(`/residents/${id}/dropoffs`, data),
+  redeem:       (id, data) => api.post(`/residents/${id}/redemptions`, data),
+  requestPickup:(id, data) => api.post(`/residents/${id}/pickups`, data),
+  getPickups:   (id) => api.get(`/residents/${id}/pickups`),
+  leaderboard:  () => api.get('/residents/leaderboard/zones'),
+}
+
+export const pickupAPI = {
+  getAvailable:  () => api.get('/pickups/available'),
+  accept:        (id) => api.post(`/pickups/${id}/accept`),
+  getByCollector:(id) => api.get(`/pickups/collector/${id}`),
+  collect:       (id) => api.post(`/pickups/${id}/collect`),
 }
 
 export const routingAPI = {
